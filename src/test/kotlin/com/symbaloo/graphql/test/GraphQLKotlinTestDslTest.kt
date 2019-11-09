@@ -7,6 +7,7 @@ import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
 import assertk.assertions.isInstanceOf
 import assertk.assertions.isNotNull
+import assertk.assertions.isNull
 import assertk.assertions.key
 import graphql.ExecutionResult
 import graphql.GraphQL
@@ -64,7 +65,7 @@ class GraphQLKotlinTestDslTest {
     fun `everything is fine`() {
         // the graphql-java schema
         val schema: GraphQL = createTestSchema()
-        graphQLTest(schema) {
+        val result = graphQLTest(schema) {
             // define a query
             query(
                 """
@@ -75,17 +76,34 @@ class GraphQLKotlinTestDslTest {
             )
             // add a variable
             variable("echo", "response")
-        }.andExpect {
-            // do assertions
-            noErrors()
-            pathIsEqualTo("echo", "response")
-            doWithPath<String?>("\$.hello.hello") {
-                assertThat(it).isEqualTo("world")
-            }
-            doWithPath<Map<String, Any>>("\$.hello") {
-                assertThat(it).contains("hello", "world")
-            }
         }
+            // check for noErrors
+            .andExpect { noErrors() }
+            // create json context
+            .andExpectJson {
+                // go into the result with a json path
+                path<String>("\$.hello.hello") {
+                    // quick isEqualTo check
+                    isEqualTo("world")
+                    // do something with the result
+                    andDo {
+                        assertThat(it).isEqualTo("world")
+                    }
+                }
+                // combination of `path` and `andDo`
+                pathAndDo("\$.hello") { it: Map<String, Any> ->
+                    assertThat(it).contains("hello", "world")
+                }
+
+                // it can also return values
+                val hello = pathAndDo("\$.hello") { map: Map<String, Any> ->
+                    map["hello"]
+                }
+                assertThat(hello).isEqualTo("world")
+            }
+            .andReturn()
+
+        assertThat(result.extensions).isNull()
     }
 
     @Nested
@@ -190,15 +208,15 @@ class GraphQLKotlinTestDslTest {
         }
 
         @Test
-        fun `andAsJson shortcut`() {
+        fun `andExpectJson shortcut`() {
             graphQLTest(createTestSchema()) {
                 query("{ hello { infinite { hello } } }")
-            }.andAsJson {
+            }.andExpectJson {
                 path<String>("$.hello.infinite.hello") {
                     isEqualTo("worldworld")
                 }
-                doWithPath<Map<String, Any>>("$.hello") {
-                    assertThat(it).key("infinite").isNotNull()
+                pathAndDo("$.hello") { map: Map<String, Any> ->
+                    assertThat(map).key("infinite").isNotNull()
                 }
             }
         }
@@ -252,41 +270,31 @@ class GraphQLKotlinTestDslTest {
                     }
                 }
 
-                val result1 = json { doWithPath<Int, Int>("$.answer") { it * 2 } }
+                val result1 = json { pathAndDo("$.answer") { it: Int -> it * 2 } }
                 assertThat(result1).isEqualTo(84)
 
-                val result2 = json { path<Int, Int>("$.answer") { read() } }
+                val result2 = json { path<Int, Int>("$.answer") { andDo { it } } }
                 assertThat(result2).isEqualTo(42)
             }
         }
 
         @Test
-        fun doWithPath() {
+        fun pathAndDo() {
             graphQLTest(createTestSchema()) {
                 query("{ hello { infinite { hello } } }")
             }.andExpect {
                 noErrors()
-                doWithPath<String>("$.hello.infinite.hello") {
+                pathAndDo("$.hello.infinite.hello") { it: String ->
                     assertThat(it).isEqualTo("worldworld")
                 }
+                val result = pathAndDo<String, Int>("$.hello.infinite.hello") { it.length }
+                assertThat(result).isEqualTo(10)
             }
         }
     }
 
     @Nested
     inner class GraphQLJsonPathResultMatcherDsl {
-
-        @Test
-        fun `json path read`() {
-            graphQLTest(createTestSchema()) {
-                query("{ hello { infinite { hello } } }")
-            }.andExpect {
-                path<String>("$.hello.infinite.hello") {
-                    val x = read()
-                    assertThat(x).isEqualTo("worldworld")
-                }
-            }
-        }
 
         @Test
         fun `json path andDo`() {
@@ -310,9 +318,9 @@ class GraphQLKotlinTestDslTest {
                 query("{ hello { infinite { infinite { hello } } } }")
             }.andExpect {
                 noErrors()
-                assertThat(path<String>("$.hello.infinite.infinite.hello") {
+                path<String>("$.hello.infinite.infinite.hello") {
                     isEqualTo("worldworldworldworld")
-                })
+                }
             }
         }
     }

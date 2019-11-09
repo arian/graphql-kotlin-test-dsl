@@ -87,7 +87,7 @@ fun GraphQLResultActionsDsl.andExpect(expectations: GraphQLResultMatcherDsl.() -
 /**
  * @return [GraphQLResultActionsDsl] for asserting and checking results
  */
-fun GraphQLResultActionsDsl.andAsJson(expectations: GraphQLJsonResultMatcherDsl.() -> Unit): GraphQLResultActionsDsl {
+fun GraphQLResultActionsDsl.andExpectJson(expectations: GraphQLJsonResultMatcherDsl.() -> Unit): GraphQLResultActionsDsl {
     andExpect { json { expectations() } }
     return this
 }
@@ -189,12 +189,9 @@ fun <T> GraphQLResultMatcherDsl.pathIsEqualTo(path: String, value: T) {
 /**
  * Be able to do something (e.g. assertions) with the value at the given path
  */
-fun <T, R> GraphQLResultMatcherDsl.doWithPath(path: String, matcher: (T) -> R): R {
+fun <T, R> GraphQLResultMatcherDsl.pathAndDo(path: String, matcher: (T) -> R): R {
     return json { path<T, R>(path) { andDo(matcher) } }
 }
-
-fun <T> GraphQLResultMatcherDsl.doWithPath(path: String, matcher: (T) -> Unit): Unit =
-    doWithPath<T, Unit>(path, matcher)
 
 class GraphQLJsonResultMatcherDsl(
     internal val json: String,
@@ -216,12 +213,9 @@ fun <T> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResult
 /**
  * Be able to do something (e.g. assertions) with the value at the given path
  */
-fun <T, R> GraphQLJsonResultMatcherDsl.doWithPath(path: String, matcher: (T) -> R): R {
+fun <T, R> GraphQLJsonResultMatcherDsl.pathAndDo(path: String, matcher: (T) -> R): R {
     return path<T, R>(path) { andDo(matcher) }
 }
-
-fun <T> GraphQLJsonResultMatcherDsl.doWithPath(path: String, matcher: (T) -> Unit): Unit =
-    doWithPath<T, Unit>(path, matcher)
 
 /**
  * Returns the [ExecutionResult] as a JSON string
@@ -231,13 +225,6 @@ fun <R> GraphQLJsonResultMatcherDsl.doWithJsonString(fn: (String) -> R): R {
 }
 
 class GraphQLJsonPathResultMatcherDsl<out T>(internal val path: String, internal val data: Any, internal val value: T)
-
-/**
- * Return value at path
- */
-fun <T> GraphQLJsonPathResultMatcherDsl<T>.read(): T {
-    return value
-}
 
 /**
  * Do something with the result

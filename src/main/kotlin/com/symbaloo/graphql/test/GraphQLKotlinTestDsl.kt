@@ -1,6 +1,7 @@
 package com.symbaloo.graphql.test
 
 import com.google.gson.Gson
+import com.jayway.jsonpath.DocumentContext
 import com.jayway.jsonpath.JsonPath
 import com.jayway.jsonpath.PathNotFoundException
 import graphql.ExecutionInput
@@ -76,10 +77,18 @@ fun GraphQLQueryBuilderDsl.builder(builder: (ExecutionInput.Builder) -> Unit) {
 class GraphQLResultActionsDsl(internal val executionResult: ExecutionResult)
 
 /**
- * @return ResultActions for asserting and checking results
+ * @return [GraphQLResultActionsDsl] for asserting and checking results
  */
 fun GraphQLResultActionsDsl.andExpect(expectations: GraphQLResultMatcherDsl.() -> Unit): GraphQLResultActionsDsl {
-    GraphQLResultMatcherDsl(this.executionResult).expectations()
+    GraphQLResultMatcherDsl(executionResult).expectations()
+    return this
+}
+
+/**
+ * @return [GraphQLResultActionsDsl] for asserting and checking results
+ */
+fun GraphQLResultActionsDsl.andAsJson(expectations: GraphQLJsonResultMatcherDsl.() -> Unit): GraphQLResultActionsDsl {
+    andExpect { json { expectations() } }
     return this
 }
 
@@ -88,7 +97,7 @@ fun GraphQLResultActionsDsl.andExpect(expectations: GraphQLResultMatcherDsl.() -
  * @see ExecutionResult
  */
 fun GraphQLResultActionsDsl.andDo(action: (ExecutionResult) -> Unit): GraphQLResultActionsDsl {
-    action(this.executionResult)
+    action(executionResult)
     return this
 }
 
@@ -97,7 +106,7 @@ fun GraphQLResultActionsDsl.andDo(action: (ExecutionResult) -> Unit): GraphQLRes
  * @see ExecutionResult
  */
 fun GraphQLResultActionsDsl.andReturn(): ExecutionResult {
-    return this.executionResult
+    return executionResult
 }
 
 /**
@@ -106,7 +115,10 @@ fun GraphQLResultActionsDsl.andReturn(): ExecutionResult {
  * @see GraphQLResultMatcherDsl.path
  */
 fun <T> GraphQLResultActionsDsl.andReturnPath(path: String): T {
-    return readJsonPath(path, executionResult)
+    val data = executionResult.getData<Any>()
+    val json = Gson().toJson(data)
+    val context = JsonPath.parse(json)
+    return readJsonPathOrFail(path, context, data)
 }
 
 class GraphQLResultMatcherDsl(internal val executionResult: ExecutionResult)
@@ -148,56 +160,101 @@ fun <T> GraphQLResultMatcherDsl.rootFieldEqualTo(key: String, expected: T) {
 }
 
 /**
- * Get a JsonResultMatcher DSL
+ * Parse the [ExecutionResult] data into a [GraphQLJsonResultMatcherDsl] DSL
  */
-fun <T> GraphQLResultMatcherDsl.path(path: String, fn: GraphQLJsonResultMatcherDsl<T>.() -> Unit) {
+fun <R> GraphQLResultMatcherDsl.json(fn: GraphQLJsonResultMatcherDsl.() -> R): R {
     val data = executionResult.getData<Any>()
-    val value = readJsonPath<T>(path, executionResult)
-    GraphQLJsonResultMatcherDsl<T>(path, data, value).fn()
+    val json = Gson().toJson(data)
+    val context = JsonPath.parse(json)
+    return GraphQLJsonResultMatcherDsl(json, context, data).fn()
 }
+
+/**
+ * Get a [GraphQLJsonPathResultMatcherDsl] DSL for a certain [JsonPath] path
+ */
+fun <T, R> GraphQLResultMatcherDsl.path(jsonPath: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> R): R {
+    return json { path(jsonPath, fn) }
+}
+
+fun <T> GraphQLResultMatcherDsl.path(jsonPath: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> Unit): Unit =
+    path<T, Unit>(jsonPath, fn)
 
 /**
  * Test a value in the response
  */
 fun <T> GraphQLResultMatcherDsl.pathIsEqualTo(path: String, value: T) {
-    path<T>(path) { isEqualTo(value) }
+    return json { path<T, Unit>(path) { isEqualTo(value) } }
 }
 
 /**
  * Be able to do something (e.g. assertions) with the value at the given path
  */
-fun <T> GraphQLResultMatcherDsl.withPath(path: String, matcher: (T) -> Unit) {
-    path<T>(path) { andDo(matcher) }
+fun <T, R> GraphQLResultMatcherDsl.doWithPath(path: String, matcher: (T) -> R): R {
+    return json { path<T, R>(path) { andDo(matcher) } }
 }
 
-class GraphQLJsonResultMatcherDsl<T>(internal val path: String, internal val data: Any, internal val value: T)
+fun <T> GraphQLResultMatcherDsl.doWithPath(path: String, matcher: (T) -> Unit): Unit =
+    doWithPath<T, Unit>(path, matcher)
+
+class GraphQLJsonResultMatcherDsl(
+    internal val json: String,
+    internal val context: DocumentContext,
+    internal val data: Any
+)
+
+/**
+ * Use the [GraphQLJsonPathResultMatcherDsl] for a certain [JsonPath] path
+ */
+fun <T, R> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> R): R {
+    val value: T = readJsonPathOrFail(path, context, data)
+    return GraphQLJsonPathResultMatcherDsl(path, data, value).fn()
+}
+
+fun <T> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> Unit): Unit =
+    path<T, Unit>(path, fn)
+
+/**
+ * Be able to do something (e.g. assertions) with the value at the given path
+ */
+fun <T, R> GraphQLJsonResultMatcherDsl.doWithPath(path: String, matcher: (T) -> R): R {
+    return path<T, R>(path) { andDo(matcher) }
+}
+
+fun <T> GraphQLJsonResultMatcherDsl.doWithPath(path: String, matcher: (T) -> Unit): Unit =
+    doWithPath<T, Unit>(path, matcher)
+
+/**
+ * Returns the [ExecutionResult] as a JSON string
+ */
+fun <R> GraphQLJsonResultMatcherDsl.doWithJsonString(fn: (String) -> R): R {
+    return fn(json)
+}
+
+class GraphQLJsonPathResultMatcherDsl<out T>(internal val path: String, internal val data: Any, internal val value: T)
 
 /**
  * Return value at path
  */
-fun <T> GraphQLJsonResultMatcherDsl<T>.read(): T {
+fun <T> GraphQLJsonPathResultMatcherDsl<T>.read(): T {
     return value
 }
 
 /**
  * Do something with the result
  */
-fun <T> GraphQLJsonResultMatcherDsl<T>.andDo(matcher: (T) -> Unit) {
-    matcher(read())
+fun <T, R> GraphQLJsonPathResultMatcherDsl<T>.andDo(matcher: (T) -> R): R {
+    return matcher(value)
 }
 
-fun <T> GraphQLJsonResultMatcherDsl<T>.isEqualTo(expected: T) {
-    val value: T = read()
+fun <T> GraphQLJsonPathResultMatcherDsl<T>.isEqualTo(expected: T) {
     if (expected != value) {
         throw AssertionFailedError("No match for path: $path\n\nIn data: $data", value, null)
     }
 }
 
-private fun <T> readJsonPath(path: String, executionResult: ExecutionResult): T {
-    val data = executionResult.getData<Any>()
-    val json = Gson().toJson(data)
+private fun <T> readJsonPathOrFail(path: String, context: DocumentContext, data: Any): T {
     return try {
-        JsonPath.read<T>(json, path)
+        context.read(path)
     } catch (e: PathNotFoundException) {
         throw AssertionError("No results for path: $path\n\nIn data: $data")
     }

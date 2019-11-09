@@ -1,6 +1,9 @@
+import org.jetbrains.dokka.gradle.DokkaTask
+
 plugins {
     kotlin("jvm") version "1.3.50"
     id("org.jlleitschuh.gradle.ktlint") version "9.0.0"
+    id("org.jetbrains.dokka") version "0.10.0"
     `java-library`
     `maven-publish`
     signing
@@ -14,6 +17,7 @@ val repoUrl = "https://github.com/arian/graphql-kotlin-test-dsl"
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
@@ -40,11 +44,27 @@ tasks.register<Jar>("sourcesJar") {
     from(sourceSets.main.get().allSource)
 }
 
+tasks.register<DokkaTask>("dokkaJavadoc") {
+    outputFormat = "html"
+    outputDirectory = "$buildDir/javadoc"
+}
+
+tasks.javadoc {
+    dependsOn("dokkaJavadoc")
+}
+
+tasks.register<Jar>("javadocJar") {
+    dependsOn("javadoc")
+    archiveClassifier.set("javadoc")
+    from("$buildDir/javadoc")
+}
+
 publishing {
     publications {
         create<MavenPublication>("mavenJava") {
             from(components["kotlin"])
             artifact(tasks["sourcesJar"])
+            artifact(tasks["javadocJar"])
 
             versionMapping {
                 usage("java-api") {

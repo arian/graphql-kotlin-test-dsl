@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "com.symbaloo"
-version = "1.0.4-SNAPSHOT"
+version = "1.0.4"
 description = "A Kotlin DSL to write Tests for graphql-java"
 val repoDescription = description
 val repoUrl = "https://github.com/arian/graphql-kotlin-test-dsl"

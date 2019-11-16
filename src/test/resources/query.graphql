@@ -1,0 +1,4 @@
+query Init($echo: String) {
+    echo(echo: $echo)
+    hello { hello }
+}

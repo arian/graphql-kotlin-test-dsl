@@ -46,6 +46,17 @@ fun GraphQLQueryBuilderDsl.query(query: String) {
 }
 
 /**
+ * Read .graphql query files from (test) resources
+ */
+fun GraphQLQueryBuilderDsl.queryFromFile(filename: String) {
+    query(
+        Thread.currentThread().contextClassLoader
+            ?.getResourceAsStream(filename)
+            .let { requireNotNull(it) }
+            .use { String(it.readBytes()) })
+}
+
+/**
  * Add a variable
  */
 fun GraphQLQueryBuilderDsl.variable(name: String, value: Any) {

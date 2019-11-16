@@ -1,4 +1,5 @@
 import org.jetbrains.dokka.gradle.DokkaTask
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.3.50"
@@ -32,31 +33,37 @@ dependencies {
     testImplementation("com.willowtreeapps.assertk:assertk-jvm:0.20")
 }
 
-tasks.test {
-    useJUnitPlatform()
-    testLogging {
-        events("passed", "skipped", "failed")
+tasks {
+    withType<KotlinCompile> {
+        kotlinOptions.jvmTarget = "1.8"
     }
-}
 
-tasks.register<Jar>("sourcesJar") {
-    archiveClassifier.set("sources")
-    from(sourceSets.main.get().allSource)
-}
+    test {
+        useJUnitPlatform()
+        testLogging {
+            events("passed", "skipped", "failed")
+        }
+    }
 
-tasks.register<DokkaTask>("dokkaJavadoc") {
-    outputFormat = "html"
-    outputDirectory = "$buildDir/javadoc"
-}
+    register<Jar>("sourcesJar") {
+        archiveClassifier.set("sources")
+        from(sourceSets.main.get().allSource)
+    }
 
-tasks.javadoc {
-    dependsOn("dokkaJavadoc")
-}
+    register<DokkaTask>("dokkaJavadoc") {
+        outputFormat = "html"
+        outputDirectory = "$buildDir/javadoc"
+    }
 
-tasks.register<Jar>("javadocJar") {
-    dependsOn("javadoc")
-    archiveClassifier.set("javadoc")
-    from("$buildDir/javadoc")
+    javadoc {
+        dependsOn("dokkaJavadoc")
+    }
+
+    register<Jar>("javadocJar") {
+        dependsOn("javadoc")
+        archiveClassifier.set("javadoc")
+        from("$buildDir/javadoc")
+    }
 }
 
 publishing {

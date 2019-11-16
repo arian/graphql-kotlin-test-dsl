@@ -17,6 +17,8 @@ import graphql.schema.idl.SchemaParser
 import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.opentest4j.AssertionFailedError
 
 private data class Bar(val foo: String)
 
@@ -162,6 +164,26 @@ class GraphQLKotlinTestDslTest {
                 rootFieldEqualTo("fromContext", "ctx")
             }
         }
+
+        @Test
+        fun `queryFromFile dsl`() {
+            graphQLTest(createTestSchema()) {
+                queryFromFile("./query.graphql")
+                variable("echo", "abc")
+            }.andExpect {
+                noErrors()
+            }
+        }
+
+        @Test
+        fun `queryFromFile dsl can't find the file`() {
+            assertThrows<IllegalArgumentException> {
+                graphQLTest(createTestSchema()) {
+                    queryFromFile("not-existing.graphql")
+                    variable("echo", "abc")
+                }
+            }
+        }
     }
 
     @Nested
@@ -227,12 +249,32 @@ class GraphQLKotlinTestDslTest {
     inner class GraphQLResultMatcherDsl {
 
         @Test
+        fun `noError throws an exception for failed query`() {
+            assertThrows<AssertionFailedError> {
+                graphQLTest(createTestSchema()) {
+                    query("{ abc }")
+                }.andExpect { noErrors() }
+            }
+        }
+
+        @Test
         fun `expect field`() {
             graphQLTest(createTestSchema()) {
                 query("{ answer }")
             }.andExpect {
                 noErrors()
                 rootFieldEqualTo("answer", 42)
+            }
+        }
+
+        @Test
+        fun `expect field is not equal`() {
+            assertThrows<AssertionFailedError> {
+                graphQLTest(createTestSchema()) {
+                    query("{ answer }")
+                }.andExpect {
+                    rootFieldEqualTo("answer", "123")
+                }
             }
         }
 

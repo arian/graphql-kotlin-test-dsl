@@ -14,7 +14,7 @@ and lets you use [JsonPath](https://github.com/json-path/JsonPath) to quickly re
 ### Gradle
 
 ```kotlin
-testImplementation("com.symbaloo:grapql-kotlin-test-dsl:1.0.3")
+testImplementation("com.symbaloo:grapql-kotlin-test-dsl:1.0.4")
 ```
 
 ### Maven
@@ -23,7 +23,7 @@ testImplementation("com.symbaloo:grapql-kotlin-test-dsl:1.0.3")
 <dependency>
   <groupId>com.symbaloo</groupId>
   <artifactId>graphql-kotlin-test-dsl</artifactId>
-  <version>1.0.3</version>
+  <version>1.0.4</version>
 </dependency>
 ```
 

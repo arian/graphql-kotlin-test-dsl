@@ -2,7 +2,7 @@ import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.3.50"
+    kotlin("jvm") version "1.3.61"
     id("org.jlleitschuh.gradle.ktlint") version "9.0.0"
     id("org.jetbrains.dokka") version "0.10.0"
     `java-library`

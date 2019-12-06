@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.3.61"
-    id("org.jlleitschuh.gradle.ktlint") version "9.0.0"
+    id("org.jlleitschuh.gradle.ktlint") version "9.1.1"
     id("org.jetbrains.dokka") version "0.10.0"
     `java-library`
     `maven-publish`
@@ -11,7 +11,7 @@ plugins {
 }
 
 group = "com.symbaloo"
-version = "1.0.5-SNAPSHOT"
+version = "1.0.5"
 description = "A Kotlin DSL to write Tests for graphql-java"
 val repoDescription = description
 val repoUrl = "https://github.com/arian/graphql-kotlin-test-dsl"

@@ -16,6 +16,8 @@ description = "A Kotlin DSL to write Tests for graphql-java"
 val repoDescription = description
 val repoUrl = "https://github.com/arian/graphql-kotlin-test-dsl"
 
+val isReleaseVersion = !version.toString().endsWith("SNAPSHOT")
+
 repositories {
     mavenCentral()
     jcenter()
@@ -115,7 +117,7 @@ publishing {
 
                 val releasesRepoUrl = uri("https://oss.sonatype.org/service/local/staging/deploy/maven2")
                 val snapshotsRepoUrl = uri("https://oss.sonatype.org/content/repositories/snapshots")
-                url = if (version.toString().endsWith("SNAPSHOT")) snapshotsRepoUrl else releasesRepoUrl
+                url = if (isReleaseVersion) releasesRepoUrl else snapshotsRepoUrl
 
                 // these can be set through gradle.properties
                 if (properties.containsKey("mavenRepoUser")) {
@@ -130,5 +132,8 @@ publishing {
 }
 
 signing {
-    sign(publishing.publications["mavenJava"])
+    setRequired { isReleaseVersion && gradle.taskGraph.hasTask("publish") }
+    if (isReleaseVersion) {
+        sign(publishing.publications["mavenJava"])
+    }
 }

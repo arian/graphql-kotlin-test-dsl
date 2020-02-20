@@ -42,21 +42,21 @@ class GraphQLKotlinTestDslTest {
         val schemaParser = SchemaParser()
         val typeDefinitionRegistry = schemaParser.parse(schema)
         val runtimeWiring = newRuntimeWiring()
-            .type("Query") { builder ->
-                builder.dataFetcher("hello") { Bar("world") }
-                builder.dataFetcher("answer") { 42 }
-                builder.dataFetcher("echo") { it.arguments["echo"] }
-                builder.dataFetcher("fromContext") { it.getContext<Bar>().foo }
-                builder.dataFetcher("list") { listOf(Bar("first"), Bar("second")) }
-            }
-            .type("Bar") { builder ->
-                builder.dataFetcher("hello") { it.getSource<Bar>().foo }
-                builder.dataFetcher("infinite") {
-                    val bar = it.getSource<Bar>()
-                    bar.copy(foo = bar.foo.repeat(2))
+                .type("Query") { builder ->
+                    builder.dataFetcher("hello") { Bar("world") }
+                    builder.dataFetcher("answer") { 42 }
+                    builder.dataFetcher("echo") { it.arguments["echo"] }
+                    builder.dataFetcher("fromContext") { it.getContext<Bar>().foo }
+                    builder.dataFetcher("list") { listOf(Bar("first"), Bar("second")) }
                 }
-            }
-            .build()
+                .type("Bar") { builder ->
+                    builder.dataFetcher("hello") { it.getSource<Bar>().foo }
+                    builder.dataFetcher("infinite") {
+                        val bar = it.getSource<Bar>()
+                        bar.copy(foo = bar.foo.repeat(2))
+                    }
+                }
+                .build()
 
         val schemaGenerator = SchemaGenerator()
         val graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring)
@@ -69,41 +69,40 @@ class GraphQLKotlinTestDslTest {
         val schema: GraphQL = createTestSchema()
         val result = graphQLTest(schema) {
             // define a query
-            query(
-                """
-                |query Init(${"$"}echo: String) {
-                |    echo(echo: ${"$"}echo)
-                |    hello { hello }
-                |}""".trimMargin()
+            query("""
+                    |query Init(${"$"}echo: String) {
+                    |    echo(echo: ${"$"}echo)
+                    |    hello { hello }
+                    |}""".trimMargin()
             )
             // add a variable
             variable("echo", "response")
         }
-            // check for noErrors
-            .andExpect { noErrors() }
-            // create json context
-            .andExpectJson {
-                // go into the result with a json path
-                path<String>("\$.hello.hello") {
-                    // quick isEqualTo check
-                    isEqualTo("world")
-                    // do something with the result
-                    andDo {
-                        assertThat(it).isEqualTo("world")
+                // check for noErrors
+                .andExpect { noErrors() }
+                // create json context
+                .andExpectJson {
+                    // go into the result with a json path
+                    path<String>("\$.hello.hello") {
+                        // quick isEqualTo check
+                        isEqualTo("world")
+                        // do something with the result
+                        andDo {
+                            assertThat(it).isEqualTo("world")
+                        }
                     }
-                }
-                // combination of `path` and `andDo`
-                pathAndDo("\$.hello") { it: Map<String, Any> ->
-                    assertThat(it).contains("hello", "world")
-                }
+                    // combination of `path` and `andDo`
+                    pathAndDo("\$.hello") { it: Map<String, Any> ->
+                        assertThat(it).contains("hello", "world")
+                    }
 
-                // it can also return values
-                val hello = pathAndDo("\$.hello") { map: Map<String, Any> ->
-                    map["hello"]
+                    // it can also return values
+                    val hello = pathAndDo("\$.hello") { map: Map<String, Any> ->
+                        map["hello"]
+                    }
+                    assertThat(hello).isEqualTo("world")
                 }
-                assertThat(hello).isEqualTo("world")
-            }
-            .andReturn()
+                .andReturn()
 
         assertThat(result.extensions).isNull()
     }
@@ -125,10 +124,10 @@ class GraphQLKotlinTestDslTest {
         @Test
         fun `variables dsl`() {
             val q = """
-            |query X($${"echo"}: String, $${"e2"}: String) {
-            |   echo: echo(echo: $${"echo"})
-            |   e2: echo(echo: $${"e2"})
-            |}""".trimMargin()
+                |query X($${"echo"}: String, $${"e2"}: String) {
+                |   echo: echo(echo: $${"echo"})
+                |   e2: echo(echo: $${"e2"})
+                |}""".trimMargin()
             graphQLTest(createTestSchema()) {
                 query(q)
                 variables(mapOf("echo" to "world", "e2" to "second"))
@@ -217,7 +216,7 @@ class GraphQLKotlinTestDslTest {
             assertThat(result).all {
                 isInstanceOf(ExecutionResult::class.java)
                 transform { it.getData<Map<String, Any>>()["answer"] }
-                    .isEqualTo(42)
+                        .isEqualTo(42)
             }
         }
 
@@ -317,6 +316,29 @@ class GraphQLKotlinTestDslTest {
 
                 val result2 = json { path<Int, Int>("$.answer") { andDo { it } } }
                 assertThat(result2).isEqualTo(42)
+            }
+        }
+
+        @Test
+        fun `json serialize nulls`() {
+            graphQLTest(createTestSchema()) {
+                query("""
+                    |query Init(${"$"}echo: String) {
+                    |    echo(echo: ${"$"}echo)
+                    |}""".trimMargin()
+                )
+                variable("echo", null)
+            }.andExpect {
+                noErrors()
+
+                json {
+                    doWithJsonString {
+                        assertThat(it).isEqualTo("""{"echo":null}""")
+                    }
+                    path<String?>("$.echo") {
+                        isEqualTo(null)
+                    }
+                }
             }
         }
 

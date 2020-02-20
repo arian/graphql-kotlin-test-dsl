@@ -1,7 +1,6 @@
 package com.symbaloo.graphql.test
 
-import com.google.gson.Gson
-import com.jayway.jsonpath.DocumentContext
+import com.google.gson.GsonBuilder
 import com.jayway.jsonpath.JsonPath
 import com.jayway.jsonpath.PathNotFoundException
 import graphql.ExecutionInput
@@ -22,7 +21,7 @@ class GraphQLQueryBuilderDsl(
     internal var query: String = ""
 ) {
 
-    internal val variables = mutableMapOf<String, Any>()
+    internal val variables = mutableMapOf<String, Any?>()
     internal var context: Any? = null
     internal var builder: ((ExecutionInput.Builder) -> Unit)? = null
 
@@ -50,23 +49,23 @@ fun GraphQLQueryBuilderDsl.query(query: String) {
  */
 fun GraphQLQueryBuilderDsl.queryFromFile(filename: String) {
     query(
-        Thread.currentThread().contextClassLoader
-            ?.getResourceAsStream(filename)
-            .let { requireNotNull(it) }
-            .use { String(it.readBytes()) })
+            Thread.currentThread().contextClassLoader
+                    ?.getResourceAsStream(filename)
+                    .let { requireNotNull(it) }
+                    .use { String(it.readBytes()) })
 }
 
 /**
  * Add a variable
  */
-fun GraphQLQueryBuilderDsl.variable(name: String, value: Any) {
+fun GraphQLQueryBuilderDsl.variable(name: String, value: Any?) {
     this.variables[name] = value
 }
 
 /**
  * Add multiple variables
  */
-fun GraphQLQueryBuilderDsl.variables(map: Map<String, Any>) {
+fun GraphQLQueryBuilderDsl.variables(map: Map<String, Any?>) {
     this.variables += map
 }
 
@@ -126,10 +125,7 @@ fun GraphQLResultActionsDsl.andReturn(): ExecutionResult {
  * @see GraphQLResultMatcherDsl.path
  */
 fun <T> GraphQLResultActionsDsl.andReturnPath(path: String): T {
-    val data = executionResult.getData<Any>()
-    val json = Gson().toJson(data)
-    val context = JsonPath.parse(json)
-    return readJsonPathOrFail(path, context, data)
+    return JsonPathContext(executionResult.getData<Any>()).readJsonPathOrFail(path)
 }
 
 class GraphQLResultMatcherDsl(internal val executionResult: ExecutionResult)
@@ -141,14 +137,14 @@ fun GraphQLResultMatcherDsl.noErrors() {
     val errors = this.executionResult.errors
     if (errors.isNotEmpty()) {
         throw AssertionFailedError(
-            """Expected no errors in the result.
-            |
-            |It got these errors:
-            |
-            |${errors.joinToString(">\n>\n") { it.message.prependIndent(">> ") }}
-            |""".trimMargin(),
-            emptyList<GraphQLError>(),
-            errors
+                """Expected no errors in the result.
+                |
+                |It got these errors:
+                |
+                |${errors.joinToString(">\n>\n") { it.message.prependIndent(">> ") }}
+                |""".trimMargin(),
+                emptyList<GraphQLError>(),
+                errors
         )
     }
 }
@@ -174,10 +170,8 @@ fun <T> GraphQLResultMatcherDsl.rootFieldEqualTo(key: String, expected: T) {
  * Parse the [ExecutionResult] data into a [GraphQLJsonResultMatcherDsl] DSL
  */
 fun <R> GraphQLResultMatcherDsl.json(fn: GraphQLJsonResultMatcherDsl.() -> R): R {
-    val data = executionResult.getData<Any>()
-    val json = Gson().toJson(data)
-    val context = JsonPath.parse(json)
-    return GraphQLJsonResultMatcherDsl(json, context, data).fn()
+    val context = JsonPathContext(executionResult.getData<Any>())
+    return GraphQLJsonResultMatcherDsl(context).fn()
 }
 
 /**
@@ -188,7 +182,7 @@ fun <T, R> GraphQLResultMatcherDsl.path(jsonPath: String, fn: GraphQLJsonPathRes
 }
 
 fun <T> GraphQLResultMatcherDsl.path(jsonPath: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> Unit): Unit =
-    path<T, Unit>(jsonPath, fn)
+        path<T, Unit>(jsonPath, fn)
 
 /**
  * Test a value in the response
@@ -204,22 +198,18 @@ fun <T, R> GraphQLResultMatcherDsl.pathAndDo(path: String, matcher: (T) -> R): R
     return json { path<T, R>(path) { andDo(matcher) } }
 }
 
-class GraphQLJsonResultMatcherDsl(
-    internal val json: String,
-    internal val context: DocumentContext,
-    internal val data: Any
-)
+class GraphQLJsonResultMatcherDsl internal constructor(internal val context: JsonPathContext)
 
 /**
  * Use the [GraphQLJsonPathResultMatcherDsl] for a certain [JsonPath] path
  */
 fun <T, R> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> R): R {
-    val value: T = readJsonPathOrFail(path, context, data)
-    return GraphQLJsonPathResultMatcherDsl(path, data, value).fn()
+    val value: T = context.readJsonPathOrFail(path)
+    return GraphQLJsonPathResultMatcherDsl(path, context.data, value).fn()
 }
 
 fun <T> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> Unit): Unit =
-    path<T, Unit>(path, fn)
+        path<T, Unit>(path, fn)
 
 /**
  * Be able to do something (e.g. assertions) with the value at the given path
@@ -232,7 +222,7 @@ fun <T, R> GraphQLJsonResultMatcherDsl.pathAndDo(path: String, matcher: (T) -> R
  * Returns the [ExecutionResult] as a JSON string
  */
 fun <R> GraphQLJsonResultMatcherDsl.doWithJsonString(fn: (String) -> R): R {
-    return fn(json)
+    return fn(context.json)
 }
 
 class GraphQLJsonPathResultMatcherDsl<out T>(internal val path: String, internal val data: Any, internal val value: T)
@@ -250,10 +240,17 @@ fun <T> GraphQLJsonPathResultMatcherDsl<T>.isEqualTo(expected: T) {
     }
 }
 
-private fun <T> readJsonPathOrFail(path: String, context: DocumentContext, data: Any): T {
-    return try {
-        context.read(path)
-    } catch (e: PathNotFoundException) {
-        throw AssertionError("No results for path: $path\n\nIn data: $data")
+internal class JsonPathContext(
+    internal val data: Any
+) {
+    internal val json = GsonBuilder().serializeNulls().create().toJson(data)
+    private val context = JsonPath.parse(json)
+
+    fun <T> readJsonPathOrFail(path: String): T {
+        return try {
+            context.read(path)
+        } catch (e: PathNotFoundException) {
+            throw AssertionError("No results for path: $path\n\nIn data: $data")
+        }
     }
 }

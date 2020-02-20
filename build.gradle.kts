@@ -3,8 +3,8 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.3.61"
-    id("org.jlleitschuh.gradle.ktlint") version "9.1.1"
-    id("org.jetbrains.dokka") version "0.10.0"
+    id("org.jlleitschuh.gradle.ktlint") version "9.2.1"
+    id("org.jetbrains.dokka") version "0.10.1"
     `java-library`
     `maven-publish`
     signing
@@ -66,6 +66,10 @@ tasks {
         archiveClassifier.set("javadoc")
         from("$buildDir/javadoc")
     }
+
+    ktlint {
+        version.set("0.36.0")
+    }
 }
 
 publishing {
@@ -122,8 +126,8 @@ publishing {
                 // these can be set through gradle.properties
                 if (properties.containsKey("mavenRepoUser")) {
                     credentials {
-                        username = properties["mavenRepoUser"] as String
-                        password = properties["mavenRepoPassword"] as String
+                        username = properties["mavenRepoUser"] as String?
+                        password = properties["mavenRepoPassword"] as String?
                     }
                 }
             }

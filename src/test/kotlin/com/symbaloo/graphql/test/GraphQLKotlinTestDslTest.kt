@@ -1,5 +1,6 @@
 package com.symbaloo.graphql.test
 
+import assertk.Assert
 import assertk.all
 import assertk.assertThat
 import assertk.assertions.contains
@@ -83,7 +84,7 @@ class GraphQLKotlinTestDslTest {
                 // create json context
                 .andExpectJson {
                     // go into the result with a json path
-                    path<String>("\$.hello.hello") {
+                    path<String>("$.hello.hello") {
                         // quick isEqualTo check
                         isEqualTo("world")
                         // do something with the result
@@ -92,12 +93,15 @@ class GraphQLKotlinTestDslTest {
                         }
                     }
                     // combination of `path` and `andDo`
-                    pathAndDo("\$.hello") { it: Map<String, Any> ->
+                    pathAndDo("$.hello") { it: Map<String, Any> ->
                         assertThat(it).contains("hello", "world")
                     }
 
+                    // combination of `path` and `isEqualTo`
+                    pathIsEqualTo("$.echo", "response")
+
                     // it can also return values
-                    val hello = pathAndDo("\$.hello") { map: Map<String, Any> ->
+                    val hello = pathAndDo("$.hello") { map: Map<String, Any> ->
                         map["hello"]
                     }
                     assertThat(hello).isEqualTo("world")
@@ -105,6 +109,15 @@ class GraphQLKotlinTestDslTest {
                 .andReturn()
 
         assertThat(result.extensions).isNull()
+    }
+
+    @Test
+    fun `assert library`() {
+        graphQLTest(createTestSchema()) {
+            query("{ answer }")
+        }.andExpectJson {
+            assertPath("$.answer").isEqualTo(42)
+        }
     }
 
     @Nested
@@ -338,6 +351,8 @@ class GraphQLKotlinTestDslTest {
                     path<String?>("$.echo") {
                         isEqualTo(null)
                     }
+
+                    pathIsEqualTo("$.echo", null)
                 }
             }
         }
@@ -385,7 +400,11 @@ class GraphQLKotlinTestDslTest {
                 path<String>("$.hello.infinite.infinite.hello") {
                     isEqualTo("worldworldworldworld")
                 }
+                pathIsEqualTo("$.hello.infinite.infinite.hello", "worldworldworldworld")
             }
         }
     }
 }
+
+private fun GraphQLJsonResultMatcherDsl.assertPath(path: String): Assert<Any?> =
+        pathAndDo(path) { it: Any? -> assertThat(it) }

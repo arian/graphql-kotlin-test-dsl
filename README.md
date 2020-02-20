@@ -52,7 +52,7 @@ val result: ExecutionResult = graphQLTest(schema) {
     // create json context
     .andExpectJson {
         // go into the result with a json path
-        path<String>("\$.hello.hello") {
+        path<String>("$.hello.hello") {
             // quick isEqualTo check
             isEqualTo("world")
             // do something with the result
@@ -61,17 +61,33 @@ val result: ExecutionResult = graphQLTest(schema) {
             }
         }
         // combination of `path` and `andDo`
-        pathAndDo("\$.hello") { it: Map<String, Any> ->
+        pathAndDo("$.hello") { it: Map<String, Any> ->
             assertThat(it).contains("hello", "world")
         }
 
+        // combination of `path` and `isEqualTo`
+        pathIsEqualTo("$.echo", "response")
+
         // it can also return values
-        val hello = pathAndDo("\$.hello") { map: Map<String, Any> ->
+        val hello = pathAndDo("$.hello") { map: Map<String, Any> ->
             map["hello"]
         }
         assertThat(hello).isEqualTo("world")
     }
     .andReturn()
+```
+
+### Link with your Assertion Library
+
+```kotlin
+graphQLTest(createTestSchema()) {
+    query("{ answer }")
+}.andExpectJson {
+    assertPath("$.answer").isEqualTo(42)
+}
+
+fun GraphQLJsonResultMatcherDsl.assertPath(path: String): Assert<Any?> =
+    pathAndDo(path) { it: Any? -> assertThat(it) }
 ```
 
 License

@@ -212,6 +212,12 @@ fun <T> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResult
         path<T, Unit>(path, fn)
 
 /**
+ * Test the result of a [JsonPath] to be equal to a certain value
+ */
+fun <T> GraphQLJsonResultMatcherDsl.pathIsEqualTo(path: String, expected: T): Unit =
+        path<T, Unit>(path) { isEqualTo(expected) }
+
+/**
  * Be able to do something (e.g. assertions) with the value at the given path
  */
 fun <T, R> GraphQLJsonResultMatcherDsl.pathAndDo(path: String, matcher: (T) -> R): R {

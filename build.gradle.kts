@@ -132,8 +132,8 @@ publishing {
                 // these can be set through gradle.properties
                 if (properties.containsKey("mavenRepoUser")) {
                     credentials {
-                        username = properties["mavenRepoUser"] as String?
-                        password = properties["mavenRepoPassword"] as String?
+                        username = properties["sonatypeRepoUser"] as String?
+                        password = properties["sonatypeRepoPassword"] as String?
                     }
                 }
             }

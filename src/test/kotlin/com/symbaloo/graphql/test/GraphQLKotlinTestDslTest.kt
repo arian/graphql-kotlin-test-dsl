@@ -6,10 +6,13 @@ import assertk.assertThat
 import assertk.assertions.contains
 import assertk.assertions.hasSize
 import assertk.assertions.isEqualTo
+import assertk.assertions.isFailure
 import assertk.assertions.isInstanceOf
 import assertk.assertions.isNotNull
 import assertk.assertions.isNull
 import assertk.assertions.key
+import assertk.assertions.prop
+import assertk.assertions.startsWith
 import graphql.ExecutionResult
 import graphql.GraphQL
 import graphql.schema.idl.RuntimeWiring.newRuntimeWiring
@@ -43,21 +46,21 @@ class GraphQLKotlinTestDslTest {
         val schemaParser = SchemaParser()
         val typeDefinitionRegistry = schemaParser.parse(schema)
         val runtimeWiring = newRuntimeWiring()
-                .type("Query") { builder ->
-                    builder.dataFetcher("hello") { Bar("world") }
-                    builder.dataFetcher("answer") { 42 }
-                    builder.dataFetcher("echo") { it.arguments["echo"] }
-                    builder.dataFetcher("fromContext") { it.getContext<Bar>().foo }
-                    builder.dataFetcher("list") { listOf(Bar("first"), Bar("second")) }
+            .type("Query") { builder ->
+                builder.dataFetcher("hello") { Bar("world") }
+                builder.dataFetcher("answer") { 42 }
+                builder.dataFetcher("echo") { it.arguments["echo"] }
+                builder.dataFetcher("fromContext") { it.getContext<Bar>().foo }
+                builder.dataFetcher("list") { listOf(Bar("first"), Bar("second")) }
+            }
+            .type("Bar") { builder ->
+                builder.dataFetcher("hello") { it.getSource<Bar>().foo }
+                builder.dataFetcher("infinite") {
+                    val bar = it.getSource<Bar>()
+                    bar.copy(foo = bar.foo.repeat(2))
                 }
-                .type("Bar") { builder ->
-                    builder.dataFetcher("hello") { it.getSource<Bar>().foo }
-                    builder.dataFetcher("infinite") {
-                        val bar = it.getSource<Bar>()
-                        bar.copy(foo = bar.foo.repeat(2))
-                    }
-                }
-                .build()
+            }
+            .build()
 
         val schemaGenerator = SchemaGenerator()
         val graphQLSchema = schemaGenerator.makeExecutableSchema(typeDefinitionRegistry, runtimeWiring)
@@ -70,7 +73,8 @@ class GraphQLKotlinTestDslTest {
         val schema: GraphQL = createTestSchema()
         val result = graphQLTest(schema) {
             // define a query
-            query("""
+            query(
+                """
                     |query Init(${"$"}echo: String) {
                     |    echo(echo: ${"$"}echo)
                     |    hello { hello }
@@ -79,34 +83,34 @@ class GraphQLKotlinTestDslTest {
             // add a variable
             variable("echo", "response")
         }
-                // check for noErrors
-                .andExpect { noErrors() }
-                // create json context
-                .andExpectJson {
-                    // go into the result with a json path
-                    path<String>("$.hello.hello") {
-                        // quick isEqualTo check
-                        isEqualTo("world")
-                        // do something with the result
-                        andDo {
-                            assertThat(it).isEqualTo("world")
-                        }
+            // check for noErrors
+            .andExpect { noErrors() }
+            // create json context
+            .andExpectJson {
+                // go into the result with a json path
+                path<String>("$.hello.hello") {
+                    // quick isEqualTo check
+                    isEqualTo("world")
+                    // do something with the result
+                    andDo {
+                        assertThat(it).isEqualTo("world")
                     }
-                    // combination of `path` and `andDo`
-                    pathAndDo("$.hello") { it: Map<String, Any> ->
-                        assertThat(it).contains("hello", "world")
-                    }
-
-                    // combination of `path` and `isEqualTo`
-                    pathIsEqualTo("$.echo", "response")
-
-                    // it can also return values
-                    val hello = pathAndDo("$.hello") { map: Map<String, Any> ->
-                        map["hello"]
-                    }
-                    assertThat(hello).isEqualTo("world")
                 }
-                .andReturn()
+                // combination of `path` and `andDo`
+                pathAndDo("$.hello") { it: Map<String, Any> ->
+                    assertThat(it).contains("hello", "world")
+                }
+
+                // combination of `path` and `isEqualTo`
+                pathIsEqualTo("$.echo", "response")
+
+                // it can also return values
+                val hello = pathAndDo("$.hello") { map: Map<String, Any> ->
+                    map["hello"]
+                }
+                assertThat(hello).isEqualTo("world")
+            }
+            .andReturn()
 
         assertThat(result.extensions).isNull()
     }
@@ -229,7 +233,7 @@ class GraphQLKotlinTestDslTest {
             assertThat(result).all {
                 isInstanceOf(ExecutionResult::class.java)
                 transform { it.getData<Map<String, Any>>()["answer"] }
-                        .isEqualTo(42)
+                    .isEqualTo(42)
             }
         }
 
@@ -335,7 +339,8 @@ class GraphQLKotlinTestDslTest {
         @Test
         fun `json serialize nulls`() {
             graphQLTest(createTestSchema()) {
-                query("""
+                query(
+                    """
                     |query Init(${"$"}echo: String) {
                     |    echo(echo: ${"$"}echo)
                     |}""".trimMargin()
@@ -403,8 +408,29 @@ class GraphQLKotlinTestDslTest {
                 pathIsEqualTo("$.hello.infinite.infinite.hello", "worldworldworldworld")
             }
         }
+
+        @Test
+        fun `json path dsl isEqualTo error message`() {
+            graphQLTest(createTestSchema()) {
+                query("{ answer }")
+            }.andExpect {
+                noErrors()
+                path<String>("$.answer") {
+                    assertThat { isEqualTo(1) }
+                        .isFailure()
+                        .isInstanceOf(AssertionFailedError::class)
+                        .all {
+                            prop(AssertionFailedError::message)
+                                .isNotNull()
+                                .startsWith("expected: <1> but was: <42>")
+                            transform { it.actual.stringRepresentation }.isEqualTo("42")
+                            transform { it.expected.stringRepresentation }.isEqualTo("1")
+                        }
+                }
+            }
+        }
     }
 }
 
 private fun GraphQLJsonResultMatcherDsl.assertPath(path: String): Assert<Any?> =
-        pathAndDo(path) { it: Any? -> assertThat(it) }
+    pathAndDo(path) { it: Any? -> assertThat(it) }

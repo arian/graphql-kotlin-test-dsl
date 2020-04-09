@@ -49,10 +49,10 @@ fun GraphQLQueryBuilderDsl.query(query: String) {
  */
 fun GraphQLQueryBuilderDsl.queryFromFile(filename: String) {
     query(
-            Thread.currentThread().contextClassLoader
-                    ?.getResourceAsStream(filename)
-                    .let { requireNotNull(it) }
-                    .use { String(it.readBytes()) })
+        Thread.currentThread().contextClassLoader
+            ?.getResourceAsStream(filename)
+            .let { requireNotNull(it) }
+            .use { String(it.readBytes()) })
 }
 
 /**
@@ -97,7 +97,9 @@ fun GraphQLResultActionsDsl.andExpect(expectations: GraphQLResultMatcherDsl.() -
 /**
  * @return [GraphQLResultActionsDsl] for asserting and checking results
  */
-fun GraphQLResultActionsDsl.andExpectJson(expectations: GraphQLJsonResultMatcherDsl.() -> Unit): GraphQLResultActionsDsl {
+fun GraphQLResultActionsDsl.andExpectJson(
+    expectations: GraphQLJsonResultMatcherDsl.() -> Unit
+): GraphQLResultActionsDsl {
     andExpect { json { expectations() } }
     return this
 }
@@ -136,15 +138,16 @@ class GraphQLResultMatcherDsl(internal val executionResult: ExecutionResult)
 fun GraphQLResultMatcherDsl.noErrors() {
     val errors = this.executionResult.errors
     if (errors.isNotEmpty()) {
-        throw AssertionFailedError(
-                """Expected no errors in the result.
-                |
-                |It got these errors:
-                |
-                |${errors.joinToString(">\n>\n") { it.message.prependIndent(">> ") }}
-                |""".trimMargin(),
-                emptyList<GraphQLError>(),
-                errors
+        fail(
+            """
+            |Expected no errors in the result.
+            |
+            |It got these errors:
+            |
+            |${errors.joinToString(">\n>\n") { it.message.prependIndent(">> ") }}
+            |""".trimMargin(),
+            emptyList<GraphQLError>(),
+            errors
         )
     }
 }
@@ -157,7 +160,7 @@ fun <T> GraphQLResultMatcherDsl.rootFieldEqualTo(key: String, expected: T) {
         is Map<*, *> -> {
             val actual = data[key]
             if (actual != expected) {
-                throw AssertionFailedError("Expected field with key: $key", actual, expected)
+                fail("Expected field with key: $key", expected, actual)
             }
         }
         else -> {
@@ -182,7 +185,7 @@ fun <T, R> GraphQLResultMatcherDsl.path(jsonPath: String, fn: GraphQLJsonPathRes
 }
 
 fun <T> GraphQLResultMatcherDsl.path(jsonPath: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> Unit): Unit =
-        path<T, Unit>(jsonPath, fn)
+    path<T, Unit>(jsonPath, fn)
 
 /**
  * Test a value in the response
@@ -209,13 +212,13 @@ fun <T, R> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathRes
 }
 
 fun <T> GraphQLJsonResultMatcherDsl.path(path: String, fn: GraphQLJsonPathResultMatcherDsl<T>.() -> Unit): Unit =
-        path<T, Unit>(path, fn)
+    path<T, Unit>(path, fn)
 
 /**
  * Test the result of a [JsonPath] to be equal to a certain value
  */
 fun <T> GraphQLJsonResultMatcherDsl.pathIsEqualTo(path: String, expected: T): Unit =
-        path<T, Unit>(path) { isEqualTo(expected) }
+    path<T, Unit>(path) { isEqualTo(expected) }
 
 /**
  * Be able to do something (e.g. assertions) with the value at the given path
@@ -242,7 +245,19 @@ fun <T, R> GraphQLJsonPathResultMatcherDsl<T>.andDo(matcher: (T) -> R): R {
 
 fun <T> GraphQLJsonPathResultMatcherDsl<T>.isEqualTo(expected: T) {
     if (expected != value) {
-        throw AssertionFailedError("No match for path: $path\n\nIn data: $data", value, null)
+        fail(
+            """
+            |
+            |Expected <$value> to be equal to <$expected>
+            |
+            |In path: $path
+            |
+            |In data: $data
+            |
+            """.trimMargin(),
+            expected,
+            value
+        )
     }
 }
 
@@ -259,4 +274,13 @@ internal class JsonPathContext(
             throw AssertionError("No results for path: $path\n\nIn data: $data")
         }
     }
+}
+
+private fun fail(message: String, expected: Any?, value: Any?) {
+    throw AssertionFailedError(
+        "expected: <$expected> but was: <$value>",
+        expected,
+        value,
+        AssertionError(message)
+    )
 }

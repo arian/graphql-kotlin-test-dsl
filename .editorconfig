@@ -1,0 +1,13 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+tab_width = 4
+indent_style = space
+
+[{*.kt, *.kts}]
+max_line_length = 120
+ij_smart_tabs = true
+ij_continuation_indent_size = 4

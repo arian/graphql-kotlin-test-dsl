@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm") version "1.3.61"
-    id("org.jlleitschuh.gradle.ktlint") version "9.2.1"
+    id("com.diffplug.gradle.spotless") version "3.28.1"
     id("org.jetbrains.dokka") version "0.10.1"
     `java-library`
     `maven-publish`
@@ -30,9 +30,10 @@ dependencies {
     implementation("com.google.code.gson:gson:2.8.6")
     implementation("org.opentest4j:opentest4j:1.2.0")
     implementation("org.slf4j:slf4j-api:1.7.+")
+    testImplementation(kotlin("reflect"))
     testImplementation("org.slf4j:slf4j-simple:1.7.+")
     testImplementation("org.junit.jupiter:junit-jupiter:5.5.2")
-    testImplementation("com.willowtreeapps.assertk:assertk-jvm:0.20")
+    testImplementation("com.willowtreeapps.assertk:assertk-jvm:0.22")
 }
 
 tasks {
@@ -66,9 +67,14 @@ tasks {
         archiveClassifier.set("javadoc")
         from("$buildDir/javadoc")
     }
+}
 
-    ktlint {
-        version.set("0.36.0")
+spotless {
+    kotlin {
+        ktlint("0.36.0")
+    }
+    kotlinGradle {
+        ktlint("0.36.0")
     }
 }
 

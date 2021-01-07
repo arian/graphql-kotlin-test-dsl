@@ -13,6 +13,7 @@ import assertk.assertions.isNull
 import assertk.assertions.key
 import assertk.assertions.prop
 import assertk.assertions.startsWith
+import graphql.ExceptionWhileDataFetching
 import graphql.ExecutionResult
 import graphql.GraphQL
 import graphql.schema.idl.RuntimeWiring.newRuntimeWiring
@@ -33,6 +34,7 @@ private val schema = """
     |    echo(echo: String): String
     |    fromContext: String
     |    list: [Bar!]!
+    |    error: Int
     |}
     |type Bar {
     |    hello: String
@@ -52,6 +54,7 @@ class GraphQLKotlinTestDslTest {
                 builder.dataFetcher("echo") { it.arguments["echo"] }
                 builder.dataFetcher("fromContext") { it.getContext<Bar>().foo }
                 builder.dataFetcher("list") { listOf(Bar("first"), Bar("second")) }
+                builder.dataFetcher("error") { throw Exception("oops") }
             }
             .type("Bar") { builder ->
                 builder.dataFetcher("hello") { it.getSource<Bar>().foo }
@@ -375,6 +378,18 @@ class GraphQLKotlinTestDslTest {
                 assertThat(result).isEqualTo(10)
             }
         }
+
+        @Test
+        fun noErrors() {
+            assertThat {
+                graphQLTest(createTestSchema()) { query("{ error }") }.andExpect { noErrors() }
+            }.isFailure()
+        }
+
+        @Test
+        fun hasError() {
+            graphQLTest(createTestSchema()) { query("{ error }") }.andExpect { hasError() }
+        }
     }
 
     @Nested
@@ -428,6 +443,41 @@ class GraphQLKotlinTestDslTest {
                         }
                 }
             }
+        }
+    }
+
+    @Nested
+    inner class GraphQLErrorResultMatcher {
+
+        @Test
+        fun `assert error path`() {
+            graphQLTest(createTestSchema()) {
+                query("{ error }")
+            }
+                .andExpect {
+                    hasError {
+                        path("error") { error ->
+                            assertThat(error)
+                                .isInstanceOf(ExceptionWhileDataFetching::class)
+                                .transform { it.exception.message }
+                                .isEqualTo("oops")
+                        }
+                    }
+                }
+        }
+
+        @Test
+        fun `assert error of non-existing path`() {
+            assertThat {
+                graphQLTest(createTestSchema()) {
+                    query("{ error }")
+                }
+                    .andExpect {
+                        hasError {
+                            path("error.bar") { }
+                        }
+                    }
+            }.isFailure()
         }
     }
 }

@@ -154,6 +154,24 @@ fun GraphQLResultMatcherDsl.noErrors() {
 }
 
 /**
+ * Assert that there is at least one error
+ */
+fun GraphQLResultMatcherDsl.hasError(matcher: GraphQLErrorResultMatcher.() -> Unit = { }) {
+    val errors = this.executionResult.errors
+    if (errors.isEmpty()) {
+        fail(
+            """
+            |Expected at least one error in the result. But there were no errors.
+            |""".trimMargin(),
+            null,
+            errors
+        )
+    } else {
+        GraphQLErrorResultMatcher(errors).matcher()
+    }
+}
+
+/**
  * Assert that some field has some value
  */
 fun <T> GraphQLResultMatcherDsl.rootFieldEqualTo(key: String, expected: T) {
@@ -274,6 +292,16 @@ internal class JsonPathContext(
         } catch (e: PathNotFoundException) {
             throw AssertionError("No results for path: $path\n\nIn data: $data")
         }
+    }
+}
+
+class GraphQLErrorResultMatcher(internal val errors: List<GraphQLError>)
+
+fun <R> GraphQLErrorResultMatcher.path(path: String, matcher: (GraphQLError) -> R) {
+    val parts = path.split(".")
+    when (val error = errors.find { it.path == parts }) {
+        null -> fail("Error with path '$path' couldn't be found", path, errors)
+        else -> matcher(error)
     }
 }
 

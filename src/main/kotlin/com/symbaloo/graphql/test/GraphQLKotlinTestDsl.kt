@@ -128,7 +128,7 @@ fun GraphQLResultActionsDsl.andReturn(): ExecutionResult {
  * @see GraphQLResultMatcherDsl.path
  */
 fun <T> GraphQLResultActionsDsl.andReturnPath(path: String): T {
-    return JsonPathContext(executionResult.getData<Any>()).readJsonPathOrFail(path)
+    return JsonPathContext(executionResult.getData()).readJsonPathOrFail(path)
 }
 
 class GraphQLResultMatcherDsl(internal val executionResult: ExecutionResult)
@@ -192,7 +192,7 @@ fun <T> GraphQLResultMatcherDsl.rootFieldEqualTo(key: String, expected: T) {
  * Parse the [ExecutionResult] data into a [GraphQLJsonResultMatcherDsl] DSL
  */
 fun <R> GraphQLResultMatcherDsl.json(fn: GraphQLJsonResultMatcherDsl.() -> R): R {
-    val context = JsonPathContext(executionResult.getData<Any>())
+    val context = JsonPathContext(executionResult.getData())
     return GraphQLJsonResultMatcherDsl(context).fn()
 }
 
@@ -297,7 +297,7 @@ internal class JsonPathContext(
 
 class GraphQLErrorResultMatcher(internal val errors: List<GraphQLError>)
 
-fun <R> GraphQLErrorResultMatcher.path(path: String, matcher: (GraphQLError) -> R) {
+fun GraphQLErrorResultMatcher.path(path: String, matcher: (GraphQLError) -> Unit = { }) {
     val parts = path.split(".")
     when (val error = errors.find { it.path == parts }) {
         null -> fail("Error with path '$path' couldn't be found", path, errors)

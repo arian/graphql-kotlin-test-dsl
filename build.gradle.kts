@@ -1,10 +1,9 @@
-import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm") version "1.3.61"
-    id("com.diffplug.gradle.spotless") version "3.28.1"
-    id("org.jetbrains.dokka") version "0.10.1"
+    kotlin("jvm") version "1.4.21"
+    id("com.diffplug.spotless") version "5.9.0"
+    id("org.jetbrains.dokka") version "1.4.20"
     `java-library`
     `maven-publish`
     signing
@@ -24,16 +23,15 @@ repositories {
 }
 
 dependencies {
-    api("com.graphql-java:graphql-java:12.+")
-    implementation(kotlin("stdlib"))
-    implementation("com.jayway.jsonpath:json-path:2.4.+")
+    api("com.graphql-java:graphql-java:15.+")
+    implementation("com.jayway.jsonpath:json-path:2.5.+")
     implementation("com.google.code.gson:gson:2.8.6")
     implementation("org.opentest4j:opentest4j:1.2.0")
     implementation("org.slf4j:slf4j-api:1.7.+")
     testImplementation(kotlin("reflect"))
     testImplementation("org.slf4j:slf4j-simple:1.7.+")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.5.2")
-    testImplementation("com.willowtreeapps.assertk:assertk-jvm:0.22")
+    testImplementation("org.junit.jupiter:junit-jupiter:5.7.0")
+    testImplementation("com.willowtreeapps.assertk:assertk-jvm:0.23")
 }
 
 tasks {
@@ -53,11 +51,6 @@ tasks {
         from(sourceSets.main.get().allSource)
     }
 
-    register<DokkaTask>("dokkaJavadoc") {
-        outputFormat = "html"
-        outputDirectory = "$buildDir/javadoc"
-    }
-
     javadoc {
         dependsOn("dokkaJavadoc")
     }
@@ -71,10 +64,10 @@ tasks {
 
 spotless {
     kotlin {
-        ktlint("0.36.0")
+        ktlint("0.40.0")
     }
     kotlinGradle {
-        ktlint("0.36.0")
+        ktlint("0.40.0")
     }
 }
 

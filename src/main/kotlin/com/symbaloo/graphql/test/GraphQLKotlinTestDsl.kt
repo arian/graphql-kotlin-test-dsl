@@ -52,7 +52,8 @@ fun GraphQLQueryBuilderDsl.queryFromFile(filename: String) {
         Thread.currentThread().contextClassLoader
             ?.getResourceAsStream(filename)
             .let { requireNotNull(it) }
-            .use { String(it.readBytes()) })
+            .use { String(it.readBytes()) }
+    )
 }
 
 /**
